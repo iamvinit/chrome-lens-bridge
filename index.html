@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chrome Lens Bridge | Visual Proxy for Google Lens</title>
+    <meta name="description"
+        content="Analyze any application window or desktop screen using Chrome's native Search with Google Lens feature.">
+
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary: #2b8cee;
+            --primary-hover: #1d7bd1;
+            --bg-deep: #0f172a;
+            --bg-accent: #1e293b;
+            --text-main: #f8fafc;
+            --text-dim: #94a3b8;
+            --glass: rgba(30, 41, 59, 0.7);
+            --border: rgba(255, 255, 255, 0.1);
+            --radius: 12px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: var(--bg-deep);
+            background-image: radial-gradient(circle at top center, #1e293b 0%, #0f172a 100%);
+            color: var(--text-main);
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* State Management */
+        body[data-state="active"] #setup-view {
+            display: none;
+        }
+
+        body[data-state="setup"] #stream-view {
+            display: none;
+        }
+
+        body[data-state="setup"] #app-header {
+            display: none;
+        }
+
+        /* App Header / Menu Bar -> Now Vertical Sidebar */
+        #app-header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            width: 64px;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            padding: 24px 0;
+            z-index: 1000;
+        }
+
+        .header-top {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 24px;
+        }
+
+        .header-bottom {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 24px;
+        }
+
+        .live-indicator {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            font-size: 0.625rem;
+            font-weight: 700;
+            color: #ef4444;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .live-dot {
+            width: 10px;
+            height: 10px;
+            background: #ef4444;
+            border-radius: 50%;
+            box-shadow: 0 0 10px rgba(239, 68, 68, 0.6);
+            animation: pulse 2s infinite;
+        }
+
+        .nav-item-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-dim);
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: var(--transition);
+            position: relative;
+        }
+
+        .nav-item-btn:hover {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-main);
+        }
+
+        .nav-item-btn.btn-disconnect:hover {
+            background: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+        }
+
+        /* Tooltip Style */
+        .nav-item-btn::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            left: 74px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: #1e293b;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: var(--transition);
+            border: 1px solid var(--border);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+        }
+
+        .nav-item-btn:hover::after {
+            opacity: 1;
+            left: 80px;
+        }
+
+        /* Setup View Styling */
+        #setup-view {
+            max-width: 600px;
+            text-align: center;
+            padding: 2rem;
+            z-index: 10;
+            animation: fadeIn 0.8s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .header-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            background: rgba(43, 140, 238, 0.15);
+            color: var(--primary);
+            border-radius: 100px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            border: 1px solid rgba(43, 140, 238, 0.3);
+        }
+
+        h1 {
+            font-size: 3rem;
+            font-weight: 800;
+            letter-spacing: -0.025em;
+            margin-bottom: 1rem;
+            background: linear-gradient(to right, #fff, #94a3b8);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        p.subtitle {
+            font-size: 1.125rem;
+            color: var(--text-dim);
+            line-height: 1.6;
+            margin-bottom: 2.5rem;
+        }
+
+        .btn-primary {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            background: var(--primary);
+            color: white;
+            padding: 16px 32px;
+            border-radius: var(--radius);
+            font-size: 1.125rem;
+            font-weight: 600;
+            text-decoration: none;
+            border: none;
+            cursor: pointer;
+            transition: var(--transition);
+            box-shadow: 0 10px 15px -3px rgba(43, 140, 238, 0.4);
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 20px 25px -5px rgba(43, 140, 238, 0.4);
+        }
+
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+
+        .instructions-card {
+            margin-top: 4rem;
+            background: var(--glass);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 2rem;
+            text-align: left;
+        }
+
+        .instructions-card h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 1.25rem;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .steps {
+            list-style: none;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.5rem;
+        }
+
+        .step-item {
+            font-size: 0.875rem;
+        }
+
+        .step-number {
+            display: block;
+            color: var(--primary);
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+        }
+
+        .step-text {
+            color: var(--text-dim);
+            line-height: 1.5;
+        }
+
+        .pro-tip {
+            margin-top: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid var(--border);
+            font-size: 0.875rem;
+            color: var(--text-dim);
+            display: flex;
+            gap: 10px;
+        }
+
+        .pro-tip strong {
+            color: var(--primary);
+        }
+
+        /* Stream View Styling */
+        #stream-view {
+            width: calc(100vw - 64px);
+            height: 100vh;
+            margin-left: 64px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #000;
+            position: relative;
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            /* Disable user selection but keep context menu */
+            user-select: none;
+        }
+
+        .stream-overlay {
+            position: absolute;
+            bottom: 24px;
+            left: 24px;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-size: 0.8125rem;
+            font-weight: 500;
+            color: var(--text-main);
+            border: 1px solid var(--border);
+            pointer-events: none;
+            z-index: 100;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        #stream-view:hover .stream-overlay {
+            opacity: 1;
+        }
+
+        /* Click Tip Toast */
+        #pro-tip-toast {
+            position: fixed;
+            bottom: 80px;
+            left: 24px;
+            background: var(--primary);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+            z-index: 2000;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.3s ease;
+            pointer-events: none;
+        }
+
+        #pro-tip-toast.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Utility */
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+
+<body data-state="setup">
+
+    <header id="app-header">
+        <div class="header-top">
+            <div class="live-indicator" title="Live Stream Active">
+                <span class="live-dot"></span>
+                <span>Live</span>
+            </div>
+
+            <button id="disconnect-btn" class="nav-item-btn btn-disconnect" data-tooltip="Disconnect Share">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
+                    <line x1="12" y1="2" x2="12" y2="12"></line>
+                </svg>
+            </button>
+        </div>
+
+        <div class="header-bottom">
+            <button id="help-btn" class="nav-item-btn" data-tooltip="View Help">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <!-- Setup View -->
+    <main id="setup-view">
+        <h1>Chrome Lens Bridge</h1>
+        <p class="subtitle">
+            Analyze external desktop content by bridging your screen share
+            directly to Chrome's native analysis tools.
+        </p>
+
+        <button id="start-btn" class="btn-primary">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                <line x1="8" y1="21" x2="16" y2="21"></line>
+                <line x1="12" y1="17" x2="12" y2="21"></line>
+            </svg>
+            Start Screen Share
+        </button>
+
+        <section class="instructions-card">
+            <h3>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="16" x2="12" y2="12"></line>
+                    <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                </svg>
+                How to Use
+            </h3>
+            <div class="steps">
+                <div class="step-item">
+                    <span class="step-number">01. Share</span>
+                    <span class="step-text">Click the button above to initiate capture.</span>
+                </div>
+                <div class="step-item">
+                    <span class="step-number">02. Inspect</span>
+                    <span class="step-text">Right-click anywhere on the video feed.</span>
+                </div>
+                <div class="step-item">
+                    <span class="step-number">03. Lens</span>
+                    <span class="step-text">Select "Search image with Google Lens".</span>
+                </div>
+            </div>
+            <div class="pro-tip">
+                <strong>Pro Tip:</strong>
+                <span>To keep Lens open while switching windows, pin the Lens icon in your address bar.</span>
+            </div>
+        </section>
+    </main>
+
+    <!-- Stream View -->
+    <div id="stream-view">
+        <div class="stream-overlay">Right click for Search with Google Lens</div>
+        <video id="lens-video" autoplay playsinline muted></video>
+    </div>
+
+    <div id="pro-tip-toast">
+        <b>Pro Tip:</b> Pin the Lens icon in your address bar for quick access.
+    </div>
+
+    <script>
+        const body = document.body;
+        const startBtn = document.getElementById('start-btn');
+        const disconnectBtn = document.getElementById('disconnect-btn');
+        const helpBtn = document.getElementById('help-btn');
+        const video = document.getElementById('lens-video');
+        const proTipToast = document.getElementById('pro-tip-toast');
+
+        let currentStream = null;
+        let toastTimeout = null;
+
+        async function startCapture() {
+            try {
+                const stream = await navigator.mediaDevices.getDisplayMedia({
+                    video: {
+                        cursor: "always",
+                        displaySurface: "monitor",
+                        logicalSurface: true
+                    },
+                    audio: false
+                });
+
+                currentStream = stream;
+                video.srcObject = stream;
+                body.setAttribute('data-state', 'active');
+
+                const track = stream.getVideoTracks()[0];
+                track.onended = () => {
+                    stopCapture();
+                };
+
+            } catch (err) {
+                console.error("Error accessing display media:", err);
+                alert("Could not start screen share. Please check permissions.");
+            }
+        }
+
+        function stopCapture() {
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+                currentStream = null;
+            }
+            video.srcObject = null;
+            body.setAttribute('data-state', 'setup');
+        }
+
+        function showHelp() {
+            if (toastTimeout) clearTimeout(toastTimeout);
+            proTipToast.innerHTML = `
+                <b>How to use:</b> Right click video and select "Search with Google Lens".<br>
+                <b>Pro Tip:</b> Pin the Lens icon in your address bar for quick access.
+            `;
+            proTipToast.classList.add('visible');
+            toastTimeout = setTimeout(() => {
+                proTipToast.classList.remove('visible');
+            }, 3000); // 3 seconds for help
+        }
+
+        function showProTip() {
+            if (toastTimeout) clearTimeout(toastTimeout);
+            proTipToast.innerHTML = `<b>Pro Tip:</b> Pin the Lens icon in your address bar for quick access.`;
+            proTipToast.classList.add('visible');
+            toastTimeout = setTimeout(() => {
+                proTipToast.classList.remove('visible');
+            }, 2000);
+        }
+
+        // Event Listeners
+        startBtn.addEventListener('click', startCapture);
+        disconnectBtn.addEventListener('click', stopCapture);
+
+        // Help hover/click
+        helpBtn.addEventListener('mouseenter', showHelp);
+        helpBtn.addEventListener('click', showHelp);
+
+        // Show Pro Tip when clicking anywhere while active (excluding buttons and sidebar)
+        document.addEventListener('click', (e) => {
+            if (body.getAttribute('data-state') === 'active' &&
+                !e.target.closest('button') &&
+                !e.target.closest('#app-header')) {
+                showProTip();
+            }
+        });
+
+        video.addEventListener('error', (e) => {
+            console.error("Video error:", e);
+        });
+    </script>
+</body>
+
+</html>
