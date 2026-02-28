@@ -1,10 +1,19 @@
 # Chrome Lens Bridge
 
-Visual proxy for Google Chrome Lens. Analyze external desktop content by bridging your screen share directly to Chrome's native analysis tools.
+Use screen share to analyze any screen via Google Lens. The screen capture runs entirely locally in your browser.
 
-![demo-1](https://raw.githubusercontent.com/iamvinit/bzl/refs/heads/main/demo/screenshot_setup.png)
-![demo-2](https://raw.githubusercontent.com/iamvinit/bzl/refs/heads/main/demo/screenshot_active.png)
-![demo-3](https://raw.githubusercontent.com/iamvinit/bzl/refs/heads/main/demo/screenshot_lens.png)
+![demo-1](https://raw.githubusercontent.com/iamvinit/chrome-lens-bridge/refs/heads/main/demo/screenshot_setup.png)
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/iamvinit/chrome-lens-bridge/refs/heads/main/demo/screenshot_active.png" width="49%" />
+  <img src="https://raw.githubusercontent.com/iamvinit/chrome-lens-bridge/refs/heads/main/demo/screenshot_lens.png" width="49%" />
+</p>
+
+## Use Cases
+
+* **Zoom/Meeting Analysis:** Instantly analyze content from a shared screen during a live Zoom, or Microsoft Teams meeting.
+* **Text Extraction:** Easily select and copy text, code snippets, or links directly from a live presentation or video tutorial where you normally couldn't copy-paste.
+* **Visual Search:** Quickly look up images, diagrams, or UI elements displayed in any external desktop application.
 
 
 ## Usage
@@ -13,9 +22,6 @@ Visual proxy for Google Chrome Lens. Analyze external desktop content by bridgin
 2. **Start Share**: Click the central "Start Screen Share" button and select your target window.
 3. **Analyze**: In the active stream, **right click** anywhere and select **"Search image with Google Lens"**.
 
-<!-- ![Active Stream](assets/screenshot_active.png)
-
-![Google Lens Analysis](assets/screenshot_lens.png) -->
 
 ## Technical Info
 
