@@ -2,7 +2,10 @@
 
 Visual proxy for Google Chrome Lens. Analyze external desktop content by bridging your screen share directly to Chrome's native analysis tools.
 
-<!-- ![Setup View](assets/screenshot_setup.png) -->
+![demo-1](https://raw.githubusercontent.com/iamvinit/bzl/refs/heads/main/demo/screenshot_setup.png)
+![demo-2](https://raw.githubusercontent.com/iamvinit/bzl/refs/heads/main/demo/screenshot_active.png)
+![demo-3](https://raw.githubusercontent.com/iamvinit/bzl/refs/heads/main/demo/screenshot_lens.png)
+
 
 ## Usage
 
